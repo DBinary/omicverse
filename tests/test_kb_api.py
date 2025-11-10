@@ -1,3 +1,4 @@
+import io
 import os
 import sys
 from types import SimpleNamespace
@@ -54,13 +55,16 @@ def test_include_exclude_to_flags_various_forms():
 
 
 class DummyPopen:
+    """
+    Simulate subprocess.Popen for tests. Use io.StringIO for stdout so that it is
+    both iterable and provides close(), matching real file-like object behavior.
+    """
     def __init__(self, cmd, stdout_lines=None, returncode=0, **kwargs):
         self.cmd = cmd
         if stdout_lines is None:
             stdout_lines = ["line1\n", "line2\n"]
-        # emulate a file-like iterable object
-        self._lines = list(stdout_lines)
-        self.stdout = iter(self._lines)
+        # StringIO is iterable (yields lines) and has close()
+        self.stdout = io.StringIO(''.join(stdout_lines))
         self._returncode = returncode
 
     def wait(self):
@@ -70,7 +74,11 @@ class DummyPopen:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        pass
+        # ensure close behavior if used as context manager
+        try:
+            self.stdout.close()
+        except Exception:
+            pass
 
 
 def test_run_kb_success_monkeypatch(monkeypatch, capsys):
